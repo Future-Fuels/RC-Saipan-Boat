@@ -1,0 +1,147 @@
+#include <Servo.h>
+#include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
+
+int left_in1 = 5;
+int left_in2 = 4;
+int right_in3 = 3;
+int right_in4 = 2;
+int ena = 6;
+int enb = 7;
+
+int button1 = 48;
+int button2 = 46;
+int ledRed = 9;
+int ledBlue = 10;
+
+//Reciever module 
+int ce = 11;
+int csn = 12; 
+int sck = 52; 
+int mosi = 51; 
+int miso = 50; 
+int ir = 53;
+
+RF24 radio(11,12);
+const byte address[6] = "06967";
+
+// servo speed
+int SPEED = 45;
+
+Servo servo;
+const int servoPin = A5; 
+const int pOut = A6;
+
+
+void setup() {
+  pinMode(left_in1, OUTPUT);
+  pinMode(left_in2, OUTPUT);
+  pinMode(right_in3, OUTPUT);
+  pinMode(right_in4, OUTPUT);
+  pinMode(ena, OUTPUT);
+  pinMode(enb, OUTPUT);
+  
+  pinMode(button1, INPUT_PULLUP);
+  pinMode(button2, INPUT_PULLUP);
+  pinMode(ledRed, OUTPUT); 
+  pinMode(ledBlue, OUTPUT); 
+
+  servo.attach(servoPin);
+  pinMode(pOut, INPUT);
+  
+  Serial.begin(9600);
+
+  digitalWrite(left_in1, LOW);
+  digitalWrite(left_in2, LOW);
+  digitalWrite(right_in3, LOW);
+  digitalWrite(right_in4, LOW);
+  analogWrite(ena, 0);
+  analogWrite(enb, 0);
+
+  radio.begin(); 
+  radio.openReadingPipe(0,address);
+  radio.setPALevel(RF24_PA_LOW);
+  radio.setChannel(123);
+  radio.startListening();
+
+}
+
+bool runningFwd = false;
+int lastFwd = HIGH;
+bool runningRev = false;
+int lastRev = HIGH;
+
+
+void loop() {
+  int fwd = digitalRead(button1);
+  if (fwd == LOW && lastFwd == HIGH) {
+    
+    runningFwd = !runningFwd;
+    runningRev = false;
+    
+    delay(50);
+  }
+  lastFwd = fwd;
+
+  int rev = digitalRead(button2);
+  if (rev == LOW && lastRev == HIGH) {
+    
+    runningRev = !runningRev; 
+    runningFwd = false;
+    
+    delay(50);
+  }
+  lastRev = rev;
+
+  Serial.print("last: ");
+  Serial.print(lastFwd);
+  Serial.print(" ");
+  Serial.print(lastRev);
+  Serial.print(" running: ");
+  Serial.print(runningFwd);
+  Serial.print(" ");
+  Serial.println(runningRev);
+
+  if (runningFwd) {
+    digitalWrite(ledRed, HIGH);
+    digitalWrite(ledBlue, LOW);
+
+    digitalWrite(left_in1, LOW);
+    digitalWrite(left_in2, HIGH);
+    analogWrite(ena, SPEED);
+
+    digitalWrite(right_in3, LOW);
+    digitalWrite(right_in4, HIGH);
+    analogWrite(enb, SPEED);
+
+  } else if (runningRev) {
+    digitalWrite(ledRed, LOW);
+    digitalWrite(ledBlue, HIGH);
+
+    digitalWrite(left_in1, HIGH);
+    digitalWrite(left_in2, LOW);
+    analogWrite(ena, SPEED);
+
+    digitalWrite(right_in3, HIGH);
+    digitalWrite(right_in4, LOW);
+    analogWrite(enb, SPEED);
+  } else {
+    digitalWrite(ledRed, LOW);
+    digitalWrite(ledBlue, LOW);
+
+    digitalWrite(left_in1, LOW);
+    digitalWrite(left_in2, LOW);
+    analogWrite(ena, 0);
+
+    digitalWrite(right_in3, LOW);
+    digitalWrite(right_in4, LOW);
+    analogWrite(enb, 0);
+  }
+
+  if (radio.available()){
+    char text [32] = {0}; 
+    radio.read(&text, sizeof(text));
+    Serial.println(text);
+  }
+}
