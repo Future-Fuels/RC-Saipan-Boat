@@ -23,6 +23,7 @@ struct BTPacket {
 
 // servo
 #define SERVO 12
+#define SERVO_DEFAULT_ANGLE 0
 
 /// tx
 #define J_VRX 34

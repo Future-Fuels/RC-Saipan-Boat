@@ -124,10 +124,10 @@ void loop() {
       rightSpeed = yAxis;
 
       int servoAngle = map(xAxis, -255, 255, 0, 180);
-      servo.write(servoAngle);
 
+      servo.write(servoAngle);
     } else {
-      servo.write(90);
+      servo.write(SERVO_DEFAULT_ANGLE);
     }
 
     Serial.print("from tx: x=");
@@ -142,4 +142,3 @@ void loop() {
 
   delay(50);
 }
-
