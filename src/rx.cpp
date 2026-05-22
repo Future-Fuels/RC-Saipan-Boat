@@ -1,17 +1,10 @@
+#include "shared.h"
 #include <Arduino.h>
 #include <BluetoothSerial.h>
+#include <ESP32Servo.h>
 
 BluetoothSerial SerialBT;
-
-#define BT_RX_NAME "rcboat_rx"
-#define BT_TX_NAME "rcboat_tx"
-
-#define LEFT_IN1 33
-#define LEFT_IN2 25
-#define RIGHT_IN3 26
-#define RIGHT_IN4 27
-#define ENA 32
-#define ENB 14
+Servo servo;
 
 void motorOff(bool left, bool right) {
   if (left) {
@@ -52,24 +45,14 @@ void motorOn(int left, int right) {
   }
 }
 
-struct BTPacket {
-  int x;
-  int y;
-  int button;
-};
-
-bool readBluetoothStruct(BTPacket &btPacket) {
+bool readBluetoothPacket(BTPacket &btPacket) {
   if (SerialBT.available() >= sizeof(BTPacket)) {
-
     SerialBT.readBytes((uint8_t *)&btPacket, sizeof(BTPacket));
-
     while (SerialBT.available() > 0) {
       SerialBT.read();
     }
-
     return true;
   }
-
   return false;
 }
 
@@ -86,6 +69,9 @@ void setup() {
   pinMode(RIGHT_IN4, OUTPUT);
   pinMode(ENA, OUTPUT);
   pinMode(ENB, OUTPUT);
+
+  servo.attach(SERVO);
+  servo.write(90);
 
   motorOff(true, true);
 }
@@ -117,21 +103,31 @@ void loop() {
   int leftSpeed = 0;
   int rightSpeed = 0;
 
-  if (readBluetoothStruct(btPacket)) {
-
+  if (readBluetoothPacket(btPacket)) {
     if (btPacket.button == 1 && lastPacketButton == 0) {
       active = !active;
-      Serial.print("Boat state toggled: ");
-      Serial.println(active ? "ACTIVE" : "STANDBY");
+      Serial.print("state toggled: ");
+      Serial.println(active ? "on" : "off");
     }
+
     lastPacketButton = btPacket.button;
 
     if (active) {
-      leftSpeed = btPacket.y + btPacket.x;
-      rightSpeed = btPacket.y - btPacket.x;
+      int yAxis = btPacket.y;
+      int xAxis = btPacket.x;
 
-      leftSpeed = map(leftSpeed, -200, 200, -255, 255);
-      rightSpeed = map(rightSpeed, -200, 200, -255, 255);
+      if (abs(yAxis) < 25) {
+        yAxis = 0;
+      }
+
+      leftSpeed = yAxis;
+      rightSpeed = yAxis;
+
+      int servoAngle = map(xAxis, -255, 255, 0, 180);
+      servo.write(servoAngle);
+
+    } else {
+      servo.write(90);
     }
 
     Serial.print("from tx: x=");
@@ -146,3 +142,4 @@ void loop() {
 
   delay(50);
 }
+
