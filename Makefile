@@ -1,7 +1,7 @@
 PIO           := pio
 MONITOR_SPEED := 115200
 
-PORT_TX       := /dev/cu.usbserial-3
+PORT_TX       := /dev/cu.usbserial-0001
 PORT_RX       := /dev/cu.usbserial-0001
 
 .PHONY: all build clean compiledb \

@@ -2,3 +2,6 @@
 compile_commands.json
 .cache
 .clangd
+.mypy_cache
+.DS_Store
+

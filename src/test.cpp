@@ -1,0 +1,19 @@
+#include "shared.h"
+#include <Arduino.h>
+#include <ESP32Servo.h>
+
+Servo servo1;
+
+void setup() { servo1.attach(SERVO_1); }
+
+void loop() {
+
+  servo1.write(0);
+  delay(1000);
+  servo1.write(90);
+  delay(1000);
+  servo1.write(180);
+  delay(1000);
+  servo1.write(90);
+  delay(1000);
+}
