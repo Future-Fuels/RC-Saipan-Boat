@@ -78,7 +78,7 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(ROTARY_CLK_PIN), updateEncoder, CHANGE);
 
-  analogSetWidth(10);
+  analogSetWidth(12);
 }
 
 int lastState = HIGH;
@@ -99,8 +99,8 @@ void loop() {
   JoystickState joystick2 = readJoystick(J2_VRX, J2_VRY);
 
   btPacket.j1x = joystick1.x;
-  btPacket.j1y = joystick1.y;
-  btPacket.j2x = joystick2.x;
+  btPacket.j1y = joystick1.y; // motor forward/reverse and speed(? maybe)
+  btPacket.j2x = joystick2.x; // sevo angle
   btPacket.j2y = joystick2.y;
   btPacket.speed = rotaryValue;
   btPacket.calibrate = calibrateRequested ? 1 : 0;

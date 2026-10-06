@@ -10,16 +10,16 @@
 
 BluetoothSerial SerialBT;
 Servo servo1;
-Servo servo2;
 MPU6500_WE imu;
 
 int cappedSpeed = 255;
 
 void printPacket(const BT_TX_Packet &packet) {
   Serial.printf(
-      "j1: x=%d, y=%d | j2: x=%d, y=%d | button=%d | speed=%d | calibrate=%d\n",
+      "j1: x=%d, y=%d | j2: x=%d, y=%d | button=%d | speed=%d | calibrate=%d"
+      " | servo_cmd_us=%d\n",
       packet.j1x, packet.j1y, packet.j2x, packet.j2y, packet.button,
-      packet.speed, packet.calibrate);
+      packet.speed, packet.calibrate, servo1.readMicroseconds());
 }
 
 void motorOff(bool left, bool right) {
@@ -100,22 +100,20 @@ void setup() {
   digitalWrite(LED_BUILTIN, LOW);
 
   servo1.attach(SERVO_1);
-  servo2.attach(SERVO_2);
   servo1.write(SERVO_DEFAULT_ANGLE);
-  servo2.write(SERVO_DEFAULT_ANGLE);
 
   motorOff(true, true);
 
   // imu setup
-  Wire.begin(IMU_SDA, IMU_SCL);
-  if (!imu.init()) {
-    Serial.println("imu failed to start");
-  } else {
-    Serial.println("calibrating imu...");
-  }
+  // Wire.begin(IMU_SDA, IMU_SCL);
+  // if (!imu.init()) {
+  //   Serial.println("imu failed to start");
+  // } else {
+  //   Serial.println("calibrating imu...");
+  // }
 
   delay(1000);
-  calibrateImu();
+  // calibrateImu();
 }
 
 bool active = false;
@@ -124,8 +122,7 @@ int lastPacketCalibrate = 0;
 bool connected = false;
 BT_TX_Packet btTxPacket;
 BT_RX_Packet btRxPacket;
-int leftSpeed = 0;
-int rightSpeed = 0;
+int motorSpeed = 0;
 
 void loop() {
   if (!connected) {
@@ -144,6 +141,10 @@ void loop() {
 
   if (!SerialBT.connected()) {
     Serial.println("connection lost...");
+    motorOff(true, true);
+    motorSpeed = 0;
+    servo1.write(SERVO_DEFAULT_ANGLE);
+    active = false;
     connected = false;
     digitalWrite(LED_BUILTIN, LOW);
     return;
@@ -151,9 +152,8 @@ void loop() {
 
   if (readBluetoothPacket(btTxPacket)) {
     if (btTxPacket.calibrate == 1 && lastPacketCalibrate == 0) {
-      calibrateImu();
-      leftSpeed = 0;
-      rightSpeed = 0;
+      // calibrateImu();
+      motorSpeed = 0;
     }
 
     if (btTxPacket.button == 1 && lastPacketButton == 0) {
@@ -173,58 +173,47 @@ void loop() {
     lastPacketCalibrate = btTxPacket.calibrate;
 
     if (active) {
-      // motor 1
+      // j1 up and down motor for forward reverse
       int j1y = btTxPacket.j1y;
-      int j1x = btTxPacket.j1x;
 
       if (abs(j1y) < 25) {
         j1y = 0;
       }
 
-      leftSpeed = j1y;
+      motorSpeed = j1y;
 
-      int servo1Angle = map(j1x, -255, 255, 0, 180);
-      servo1.write(servo1Angle);
-
-      // motor 2
-      int j2y = btTxPacket.j2y;
-      int j2x = btTxPacket.j2x;
-
-      if (abs(j2y) < 25) {
-        j2y = 0;
+      // j2 left and right changes servo angles
+      int j2x = constrain(btTxPacket.j2x, -255, 255);
+      if (abs(j2x) < 25) {
+        j2x = 0;
       }
-
-      rightSpeed = j2y;
-
-      int servo2Angle = map(j2x, -255, 255, 0, 180);
-      servo2.write(servo2Angle);
+      int servo1Angle = map(j2x, -255, 255, 0, 180);
+      servo1.write(servo1Angle);
     } else {
       servo1.write(SERVO_DEFAULT_ANGLE);
-      servo2.write(SERVO_DEFAULT_ANGLE);
-      leftSpeed = 0;
-      rightSpeed = 0;
+      motorSpeed = 0;
     }
 
     printPacket(btTxPacket);
   }
 
   if (connected) {
-    xyzFloat accValues = imu.getGValues();
-    xyzFloat gyroValues = imu.getGyrValues();
-    float resG = imu.getResultantG(accValues);
-
-    btRxPacket.accX = accValues.x;
-    btRxPacket.accY = accValues.y;
-    btRxPacket.accZ = accValues.z;
-    btRxPacket.gyroX = gyroValues.x;
-    btRxPacket.gyroY = gyroValues.y;
-    btRxPacket.gyroZ = gyroValues.z;
-    btRxPacket.resG = resG;
+    // xyzFloat accValues = imu.getGValues();
+    // xyzFloat gyroValues = imu.getGyrValues();
+    // float resG = imu.getResultantG(accValues);
+    //
+    // btRxPacket.accX = accValues.x;
+    // btRxPacket.accY = accValues.y;
+    // btRxPacket.accZ = accValues.z;
+    // btRxPacket.gyroX = gyroValues.x;
+    // btRxPacket.gyroY = gyroValues.y;
+    // btRxPacket.gyroZ = gyroValues.z;
+    // btRxPacket.resG = resG;
 
     SerialBT.write((uint8_t *)&btRxPacket, sizeof(btRxPacket));
   }
 
-  motorOn(leftSpeed, rightSpeed);
+  motorOn(0, motorSpeed);
 
   delay(50);
 }

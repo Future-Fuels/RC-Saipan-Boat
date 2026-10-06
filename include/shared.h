@@ -43,16 +43,16 @@ struct BT_RX_Packet {
 // servo
 #define SERVO_1 12
 #define SERVO_2 13
-#define SERVO_DEFAULT_ANGLE 0
+#define SERVO_DEFAULT_ANGLE 90
 
 /// tx
 #define TX_WIFI_AP_SSID "futurefuels_boat"
 #define TX_WIFI_AP_PASS "12345678"
 
-#define J1_VRX 34
-#define J1_VRY 35
-#define J2_VRX 36
-#define J2_VRY 39
+#define J1_VRX 34 // orange
+#define J1_VRY 35 // yellow
+#define J2_VRX 36 // red
+#define J2_VRY 39 // brown
 #define BUTTON1 13
 
 #define ROTARY_DT_PIN 32
