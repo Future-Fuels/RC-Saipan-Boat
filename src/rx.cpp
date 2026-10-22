@@ -14,12 +14,12 @@ MPU6500_WE imu;
 
 int cappedSpeed = 255;
 
-void printPacket(const BT_TX_Packet &packet) {
+void printPacket(const BT_TX_Packet& packet) {
   Serial.printf(
-      "j1: x=%d, y=%d | j2: x=%d, y=%d | button=%d | speed=%d | calibrate=%d"
-      " | servo_cmd_us=%d\n",
-      packet.j1x, packet.j1y, packet.j2x, packet.j2y, packet.button,
-      packet.speed, packet.calibrate, servo1.readMicroseconds());
+    "j1: x=%d, y=%d | j2: x=%d, y=%d | button=%d | speed=%d | calibrate=%d"
+    " | servo_cmd_us=%d\n",
+    packet.j1x, packet.j1y, packet.j2x, packet.j2y, packet.button,
+    packet.speed, packet.calibrate, servo1.readMicroseconds());
 }
 
 void motorOff(bool left, bool right) {
@@ -43,11 +43,13 @@ void motorOn(int left, int right) {
     digitalWrite(LEFT_IN1, LOW);
     digitalWrite(LEFT_IN2, HIGH);
     analogWrite(ENA, left);
-  } else if (left < 0) {
+  }
+  else if (left < 0) {
     digitalWrite(LEFT_IN1, HIGH);
     digitalWrite(LEFT_IN2, LOW);
     analogWrite(ENA, abs(left));
-  } else {
+  }
+  else {
     motorOff(true, false);
   }
 
@@ -55,11 +57,13 @@ void motorOn(int left, int right) {
     digitalWrite(RIGHT_IN3, LOW);
     digitalWrite(RIGHT_IN4, HIGH);
     analogWrite(ENB, right);
-  } else if (right < 0) {
+  }
+  else if (right < 0) {
     digitalWrite(RIGHT_IN3, HIGH);
     digitalWrite(RIGHT_IN4, LOW);
     analogWrite(ENB, abs(right));
-  } else {
+  }
+  else {
     motorOff(false, true);
   }
 }
@@ -71,9 +75,9 @@ void calibrateImu() {
   Serial.println("calibrated");
 }
 
-bool readBluetoothPacket(BT_TX_Packet &packet) {
+bool readBluetoothPacket(BT_TX_Packet& packet) {
   if (SerialBT.available() >= sizeof(BT_TX_Packet)) {
-    SerialBT.readBytes((uint8_t *)&packet, sizeof(BT_TX_Packet));
+    SerialBT.readBytes((uint8_t*)&packet, sizeof(BT_TX_Packet));
     while (SerialBT.available() > 0) {
       SerialBT.read();
     }
@@ -131,7 +135,8 @@ void loop() {
       Serial.println("connected to rcboat_tx!");
       digitalWrite(LED_BUILTIN, HIGH);
       connected = true;
-    } else {
+    }
+    else {
       digitalWrite(LED_BUILTIN, LOW);
       Serial.println("rcboat_tx not found. retrying in 3 seconds...");
       delay(3000);
@@ -160,7 +165,7 @@ void loop() {
       active = !active;
 
       Serial.printf("state: %s -> %s\n", active ? "off" : "on",
-                    active ? "on" : "off");
+        active ? "on" : "off");
     }
 
     if (btTxPacket.speed != cappedSpeed) {
@@ -189,7 +194,8 @@ void loop() {
       }
       int servo1Angle = map(j2x, -255, 255, 0, 180);
       servo1.write(servo1Angle);
-    } else {
+    }
+    else {
       servo1.write(SERVO_DEFAULT_ANGLE);
       motorSpeed = 0;
     }
@@ -210,7 +216,7 @@ void loop() {
     // btRxPacket.gyroZ = gyroValues.z;
     // btRxPacket.resG = resG;
 
-    SerialBT.write((uint8_t *)&btRxPacket, sizeof(btRxPacket));
+    SerialBT.write((uint8_t*)&btRxPacket, sizeof(btRxPacket));
   }
 
   motorOn(0, motorSpeed);
