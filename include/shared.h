@@ -28,9 +28,14 @@ struct BT_RX_Packet {
 #define BT_TX_NAME "rcboat_tx"
 
 // imu 6-axis
-#define IMU_ADDR 0x68
+// #define IMU_ADDR 0x68
+#define IMU_ADDR 0x28
 #define IMU_SDA 21
 #define IMU_SCL 22
+
+// GPS
+#define GPS_RX 16
+#define GPS_TX 17
 
 // motors
 #define LEFT_IN1 33

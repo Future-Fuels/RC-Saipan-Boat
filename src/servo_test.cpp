@@ -3,6 +3,21 @@
 #include "shared.h"
 
 Servo servo1;
+constexpr int MOTOR_TEST_SPEED = 128;
+
+void setMotor(bool enabled) {
+  if (enabled) {
+    digitalWrite(RIGHT_IN3, LOW);
+    digitalWrite(RIGHT_IN4, HIGH);
+    analogWrite(ENB, MOTOR_TEST_SPEED);
+    Serial.println("motor on: 50%");
+  } else {
+    digitalWrite(RIGHT_IN3, LOW);
+    digitalWrite(RIGHT_IN4, LOW);
+    analogWrite(ENB, 0);
+    Serial.println("motor off");
+  }
+}
 
 void setServoAngle(int angle) {
   angle = constrain(angle, 0, 180);
@@ -25,13 +40,20 @@ void runSweep() {
 }
 
 void printHelp() {
-  Serial.println("Enter an angle from 0 to 180, c for center, or s for sweep.");
+  Serial.println(
+      "Enter an angle from 0 to 180, c for center, s for sweep, on, or off.");
 }
 
 void setup() {
   Serial.begin(115200);
+  pinMode(RIGHT_IN3, OUTPUT);
+  pinMode(RIGHT_IN4, OUTPUT);
+  pinMode(ENB, OUTPUT);
+
   servo1.attach(SERVO_1);
   setServoAngle(SERVO_DEFAULT_ANGLE);
+
+  setMotor(false);
   printHelp();
 }
 
@@ -47,6 +69,10 @@ void loop() {
     setServoAngle(SERVO_DEFAULT_ANGLE);
   } else if (command.equalsIgnoreCase("s")) {
     runSweep();
+  } else if (command.equalsIgnoreCase("on")) {
+    setMotor(true);
+  } else if (command.equalsIgnoreCase("off")) {
+    setMotor(false);
   } else {
     int angle = command.toInt();
     if (command.length() > 0 && angle >= 0 && angle <= 180) {
