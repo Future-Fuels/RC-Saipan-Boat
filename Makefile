@@ -7,7 +7,8 @@ PORT_RX       := /dev/tty.usbserial-3
 .PHONY: all build clean compiledb \
         tx-build tx-upload tx-monitor tx-run \
 	rx-build rx-upload rx-monitor rx-run \
-	servo-build servo-upload servo-monitor servo-run
+	servo-build servo-upload servo-monitor servo-run \
+	sensor-build sensor-upload sensor-monitor sensor-run
 
 all: tx-build rx-build
 
@@ -67,4 +68,19 @@ servo-monitor:
 servo-run:
 	$(PIO) run -e servo-test --target upload --upload-port $(PORT_RX)
 	$(PIO) device monitor --environment servo-test --baud $(MONITOR_SPEED) --port $(PORT_RX)
+
+
+# sensor test
+sensor-build:
+	$(PIO) run -e sensor-test
+
+sensor-upload:
+	$(PIO) run -e sensor-test --target upload --upload-port $(PORT_RX)
+
+sensor-monitor:
+	$(PIO) device monitor --environment sensor-test --baud $(MONITOR_SPEED) --port $(PORT_RX)
+
+sensor-run:
+	$(PIO) run -e sensor-test --target upload --upload-port $(PORT_RX)
+	$(PIO) device monitor --environment sensor-test --baud $(MONITOR_SPEED) --port $(PORT_RX)
 

@@ -29,7 +29,7 @@ struct BT_RX_Packet {
 
 // imu 6-axis
 // #define IMU_ADDR 0x68
-#define IMU_ADDR 0x28
+#define IMU_ADDR 0x29
 #define IMU_SDA 21
 #define IMU_SCL 22
 
