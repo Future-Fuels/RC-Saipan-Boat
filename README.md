@@ -1,12 +1,15 @@
-# RC Boat Saipan
+# RC Boat
 
-- Have platformio, make, etc.
+## Flash
 
-## Commands
+```sh
+make rx-upload tx-upload
+```
 
-- build: `make build`
-- upload: `make upload`
-- monitor serial: `make monitor`
-- run and monitor: `make run`
-- generate compile_commands.json: `make compiledb`
-- clean: `make clean`
+## Controls
+
+- J1 vertical: motor.
+- J2 horizontal: servo.
+- Rotary encoder: motor speed limit. Starts at zero.
+
+Pins and settings are in `include/shared.h`.

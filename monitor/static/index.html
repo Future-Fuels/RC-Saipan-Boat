@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>rc boat monitor</title>
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <button id="connect" type="button" disabled>reconnect</button>
+    <button id="export" type="button" disabled>export csv</button>
+    <p id="error" role="alert" hidden></p>
+
+    <p>
+      <canvas
+        id="joystick1"
+        width="150"
+        height="160"
+        role="img"
+        aria-label="joystick 1 position"
+        >joystick 1</canvas
+      >
+      <canvas
+        id="joystick2"
+        width="150"
+        height="160"
+        role="img"
+        aria-label="joystick 2 position"
+        >joystick 2</canvas
+      >
+    </p>
+
+    <h2>controls</h2>
+    <form id="servo-form">
+      <label
+        >servo (0–180°)
+        <input
+          id="servo"
+          type="number"
+          min="0"
+          max="180"
+          value="90"
+          required
+          data-control
+          disabled
+      /></label>
+      <button type="submit" data-control disabled>set</button>
+      <button type="button" data-command="servo free" disabled>free</button>
+    </form>
+    <form id="motor-form">
+      <label
+        >motor (−255–255)
+        <input
+          id="motor"
+          type="number"
+          min="-255"
+          max="255"
+          value="0"
+          required
+          data-control
+          disabled
+      /></label>
+      <button type="submit" data-control disabled>set</button>
+      <button type="button" data-command="motor free" disabled>free</button>
+    </form>
+    <form id="limit-form">
+      <label
+        >speed limit (0–255)
+        <input
+          id="limit"
+          type="number"
+          min="0"
+          max="255"
+          value="128"
+          required
+          data-control
+          disabled
+      /></label>
+      <button type="submit" data-control disabled>set</button>
+      <button type="button" data-command="limit free" disabled>
+        use rotary
+      </button>
+    </form>
+    <p>
+      <button type="button" data-command="stop" disabled>stop</button>
+      <button type="button" data-command="resume" disabled>resume</button>
+      <button type="button" data-command="unlock" disabled>unlock all</button>
+      <button type="button" data-command="gps reset" disabled>reset gps</button>
+    </p>
+    <p id="command-result" role="status" hidden></p>
+
+    <pre id="packet" aria-label="latest json packet">
+no telemetry received.
+    </pre>
+  </body>
+</html>
