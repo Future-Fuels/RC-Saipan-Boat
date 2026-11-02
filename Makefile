@@ -7,8 +7,6 @@ PORT_RX       := /dev/tty.usbserial-3
 .PHONY: all build clean compiledb \
         tx-build tx-upload tx-monitor tx-run \
 	rx-build rx-upload rx-monitor rx-run \
-	tx-esp-now-build tx-esp-now-upload tx-esp-now-monitor \
-	rx-esp-now-build rx-esp-now-upload rx-esp-now-monitor \
 	servo-build servo-upload servo-monitor servo-run \
 	sensor-build sensor-upload sensor-monitor sensor-run
 
@@ -55,26 +53,6 @@ rx-run:
 
 rx-clean:
 	$(PIO) run -e rx --target clean
-
-
-# ESP-NOW variants
-tx-esp-now-build:
-	$(PIO) run -e tx-esp-now
-
-tx-esp-now-upload:
-	$(PIO) run -e tx-esp-now --target upload --upload-port $(PORT_TX)
-
-tx-esp-now-monitor:
-	$(PIO) device monitor --environment tx-esp-now --baud $(MONITOR_SPEED) --port $(PORT_TX)
-
-rx-esp-now-build:
-	$(PIO) run -e rx-esp-now
-
-rx-esp-now-upload:
-	$(PIO) run -e rx-esp-now --target upload --upload-port $(PORT_RX)
-
-rx-esp-now-monitor:
-	$(PIO) device monitor --environment rx-esp-now --baud $(MONITOR_SPEED) --port $(PORT_RX)
 
 
 # servo test

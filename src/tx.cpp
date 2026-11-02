@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <BluetoothSerial.h>
-#include <errno.h>
 
 #include "shared.h"
 
@@ -88,25 +87,24 @@ bool applyCommand(String line) {
     return true;
   }
 
-  bool release = argument == "free";
-  long value = 0;
-
-  if (!release) {
-    char *end;
-    errno = 0;
-    value = strtol(argument.c_str(), &end, 10);
-
-    if (errno != 0 || end == argument.c_str() || *end != '\0') {
+  if (command == "servo-config") {
+    int center, deflection;
+    if (sscanf(argument.c_str(), "%d %d", &center, &deflection) != 2) {
       return false;
     }
+    control.servoDefaultAngle = center;
+    control.servoMaxDeflection = deflection;
+    return true;
   }
 
-  if (command == "servo" && (release || (value >= 0 && value <= 180))) {
+  bool release = argument == "free";
+  int value = argument.toInt();
+
+  if (command == "servo") {
     control.servoLock = release ? SERVO_FREE : value;
-  } else if (command == "motor" &&
-             (release || (value >= -255 && value <= 255))) {
+  } else if (command == "motor") {
     control.motorLock = release ? MOTOR_FREE : value;
-  } else if (command == "limit" && (release || (value >= 0 && value <= 255))) {
+  } else if (command == "limit") {
     control.speedLimit = release ? LIMIT_FREE : value;
   } else {
     return false;
@@ -151,10 +149,11 @@ void sendControls(bool connected) {
   }
 
   snprintf(commandLine, sizeof(commandLine),
-           "C %d %d %d %d %d %d %d %d %d %u\n", control.j1x, control.j1y,
+           "C %d %d %d %d %d %d %d %d %d %u %d %d\n", control.j1x, control.j1y,
            control.j2x, control.j2y, control.speed, control.servoLock,
            control.motorLock, control.speedLimit, control.stopped,
-           control.gpsResetId);
+           control.gpsResetId, control.servoDefaultAngle,
+           control.servoMaxDeflection);
 
   bluetooth.print(commandLine);
 }
@@ -166,7 +165,7 @@ void reportTelemetry(bool connected) {
       "\"accX\":0,\"accY\":0,\"accZ\":0,\"resG\":0,"
       "\"gyroX\":0,\"gyroY\":0,\"gyroZ\":0,\"imuAvailable\":false,"
       "\"gpsFix\":false,\"filterInitialized\":false,\"gpsResetId\":0,"
-      "\"active\":false,\"motorSpeed\":0,\"servoAngle\":90,"
+      "\"active\":false,\"motorSpeed\":0,\"servoAngle\":60,"
       "\"servoLocked\":false,\"motorLocked\":false,\"speedLimit\":-1,"
       "\"stopped\":"
       "false}";

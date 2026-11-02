@@ -1,26 +1,16 @@
 #pragma once
 
-#include <stddef.h>
 #include <stdint.h>
 
 // bt
 #define BT_RX_NAME "rcboat_rx"
 #define BT_TX_NAME "rcboat_tx"
 #define CONTROL_INTERVAL_MS 50UL
-#define TELEMETRY_INTERVAL_MS 100UL
+
+// limits for messages
+#define TELEMETRY_INTERVAL_MS 200UL
 #define CONTROL_TIMEOUT_MS 500UL
 #define CONNECT_RETRY_MS 3000UL
-
-// esp-now stuff
-#define ESPNOW_CHANNEL 1
-#define ESPNOW_TX_MAC {0x02, 0x52, 0x43, 0x42, 0x00, 0x10}
-#define ESPNOW_RX_MAC {0x02, 0x52, 0x43, 0x42, 0x00, 0x20}
-#define ESPNOW_KEY                                 \
-  {0x72, 0x63, 0x62, 0x6f, 0x61, 0x74, 0x2d, 0x65, \
-   0x73, 0x70, 0x6e, 0x6f, 0x77, 0x2d, 0x30, 0x31}
-#define MONITOR_SSID "futurefuels_rcboat"
-#define MONITOR_PASSWORD "12345678"
-#define MONITOR_PACKET_VERSION 1
 
 // joystick/motor response
 #define JOYSTICK_DEADBAND 25
@@ -48,13 +38,16 @@
 // servo
 #define SERVO_1 12
 #define SERVO_2 13
-#define SERVO_DEFAULT_ANGLE 90
+#define SERVO_DEFAULT_ANGLE 60
+#define SERVO_MAX_DEFLECTION 30
+#define SERVO_MIN_ANGLE (SERVO_DEFAULT_ANGLE - SERVO_MAX_DEFLECTION)
+#define SERVO_MAX_ANGLE (SERVO_DEFAULT_ANGLE + SERVO_MAX_DEFLECTION)
 
 /// tx pins
-#define J1_VRX 34  // orange
-#define J1_VRY 35  // yellow
-#define J2_VRX 36  // red
-#define J2_VRY 39  // brown
+#define J1_VRX 34 // orange
+#define J1_VRY 35 // yellow
+#define J2_VRX 36 // red
+#define J2_VRY 39 // brown
 
 #define ROTARY_DT_PIN 32
 #define ROTARY_CLK_PIN 33
@@ -81,6 +74,8 @@ struct ControlPacket {
   int speedLimit = LIMIT_FREE;
   int stopped = 0;
   unsigned int gpsResetId = 0;
+  int servoDefaultAngle = SERVO_DEFAULT_ANGLE;
+  int servoMaxDeflection = SERVO_MAX_DEFLECTION;
 };
 
 // acceleration in g, gyro in deg/s, position in meters, velocity in m/s.
@@ -92,7 +87,7 @@ struct TelemetryPacket {
   float gyroY;
   float gyroZ;
   float resG;
-  float linearAccX;  // m/s^2, gravity removed
+  float linearAccX; // m/s^2, gravity removed
   float linearAccY;
   float linearAccZ;
   float quatW;
@@ -101,17 +96,17 @@ struct TelemetryPacket {
   float quatZ;
   double latitude;
   double longitude;
-  float altitude;   // meters
-  float gpsSpeed;   // m/s
-  float gpsCourse;  // degrees
-  float east;       // filtered local position, meters from the first fix
+  float altitude;  // meters
+  float gpsSpeed;  // m/s
+  float gpsCourse; // degrees
+  float east;      // filtered local position, meters from the first fix
   float north;
-  float eastVelocity;  // m/s
+  float eastVelocity; // m/s
   float northVelocity;
   unsigned long gpsAgeMs;
   unsigned long satellites;
-  int motorSpeed;  // applied signed PWM, -255..255
-  int servoAngle;  // applied angle, degrees
+  int motorSpeed; // applied signed PWM, -255..255
+  int servoAngle; // applied angle, degrees
   unsigned long controlPackets;
   unsigned long controlAgeMs;
 
@@ -126,18 +121,4 @@ struct TelemetryPacket {
   uint8_t gyroCalibration;
   uint8_t accelCalibration;
   uint8_t magCalibration;
-};
-
-struct EspNowTelemetry {
-  TelemetryPacket telemetry;
-  ControlPacket applied;
-};
-
-struct MonitorPacket {
-  uint32_t version = MONITOR_PACKET_VERSION;
-  uint32_t uptimeMs = 0;
-  uint32_t telemetryPackets = 0;
-  uint32_t telemetryAgeMs = UINT32_MAX;
-  ControlPacket control;
-  EspNowTelemetry receiver;
 };
