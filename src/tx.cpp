@@ -3,58 +3,29 @@
 
 #include "shared.h"
 
+#define J1_VRX 34
+#define J1_VRY 35
+#define J2_VRX 36
+#define J2_VRY 39
+
 BluetoothSerial bluetooth;
-ControlPacket control;
-volatile int rotaryValue = 0;
-int lastClock = HIGH;
+PacketReader bluetoothReader;
+MonitorTelemetryPacket telemetry;
+ControlPacket &control = telemetry.control;
+
 uint32_t lastSend = 0;
 uint32_t lastReport = 0;
 uint32_t lastTelemetry = 0;
 
+bool receivedTelemetry = false;
+bool receivedTelemetryOnLink = false;
+
 String serialLine;
-String bluetoothLine;
-String receiverTelemetry;
 bool serialOverflow = false;
-bool bluetoothOverflow = false;
-char commandLine[CONTROL_LINE_SIZE];
-char jsonLine[TELEMETRY_JSON_SIZE];
 
-void IRAM_ATTR updateEncoder() {
-  int clock = digitalRead(ROTARY_CLK_PIN);
-
-  if (clock != lastClock) {
-    int direction = digitalRead(ROTARY_DT_PIN) != clock ? -1 : 1;
-    rotaryValue = constrain(rotaryValue + direction * ROTARY_STEP, ROTARY_MIN,
-                            ROTARY_MAX);
-    lastClock = clock;
-  }
-}
-
-bool readLine(Stream &input, String &line, bool &overflow, size_t limit) {
-  while (input.available() > 0) {
-    char c = input.read();
-
-    if (c == '\n' || c == '\r') {
-      bool ready = !overflow && line.length() > 0;
-      overflow = false;
-
-      if (ready) {
-        return true;
-      }
-
-      line = "";
-    } else if (line.length() < limit - 1 && c != '\0') {
-      line += c;
-    } else {
-      overflow = true;
-    }
-  }
-
-  return false;
-}
-
-bool applyCommand(String line) {
+bool applyCommand(String &line) {
   line.replace('\t', ' ');
+
   int space = line.indexOf(' ');
   String command = line;
   String argument;
@@ -67,14 +38,14 @@ bool applyCommand(String line) {
 
   if (argument.length() == 0) {
     if (command == "stop") {
-      control.stopped = 1;
+      control.controlStopped = 1;
     } else if (command == "resume") {
-      control.stopped = 0;
+      control.controlStopped = 0;
     } else if (command == "unlock") {
-      control.servoLock = SERVO_FREE;
-      control.motorLock = MOTOR_FREE;
-      control.speedLimit = LIMIT_FREE;
-      control.stopped = 0;
+      control.controlServoAngle = SERVO_FREE;
+      control.controlMotorPwm = MOTOR_FREE;
+      control.controlSpeedLimit = LIMIT_FREE;
+      control.controlStopped = 0;
     } else {
       return false;
     }
@@ -83,17 +54,21 @@ bool applyCommand(String line) {
   }
 
   if (command == "gps" && argument == "reset") {
-    ++control.gpsResetId;
+    ++control.controlGpsResetId;
+
     return true;
   }
 
   if (command == "servo-config") {
     int center, deflection;
+
     if (sscanf(argument.c_str(), "%d %d", &center, &deflection) != 2) {
       return false;
     }
-    control.servoDefaultAngle = center;
-    control.servoMaxDeflection = deflection;
+
+    control.controlServoCenter = center;
+    control.controlServoDeflection = deflection;
+
     return true;
   }
 
@@ -101,11 +76,11 @@ bool applyCommand(String line) {
   int value = argument.toInt();
 
   if (command == "servo") {
-    control.servoLock = release ? SERVO_FREE : value;
+    control.controlServoAngle = release ? SERVO_FREE : value;
   } else if (command == "motor") {
-    control.motorLock = release ? MOTOR_FREE : value;
+    control.controlMotorPwm = release ? MOTOR_FREE : value;
   } else if (command == "limit") {
-    control.speedLimit = release ? LIMIT_FREE : value;
+    control.controlSpeedLimit = release ? LIMIT_FREE : value;
   } else {
     return false;
   }
@@ -114,114 +89,114 @@ bool applyCommand(String line) {
 }
 
 void readSerialCommands() {
-  while (readLine(Serial, serialLine, serialOverflow, 64)) {
-    serialLine.trim();
-    serialLine.toLowerCase();
+  while (Serial.available() > 0) {
+    char next = Serial.read();
 
-    bool accepted = applyCommand(serialLine);
-    Serial.printf("{\"commandAccepted\":%s}\n", accepted ? "true" : "false");
+    if (next == '\r' || next == '\n') {
+      if (serialOverflow || serialLine.length() > 0) {
+        serialLine.trim();
+        serialLine.toLowerCase();
 
-    serialLine = "";
+        CommandAckPacket ack;
+        ack.controlSequence = control.controlSequence;
+        ack.commandAccepted = !serialOverflow && applyCommand(serialLine);
+
+        sendPacket(Serial, PacketType::CommandAck, ack);
+      }
+
+      serialLine = "";
+      serialOverflow = false;
+    } else if (serialLine.length() < 63 && next != '\0') {
+      serialLine += next;
+    } else {
+      serialOverflow = true;
+    }
   }
 }
 
 void readTelemetry() {
-  while (readLine(bluetooth, bluetoothLine, bluetoothOverflow,
-                  TELEMETRY_JSON_SIZE)) {
-    if (bluetoothLine.startsWith("{") && bluetoothLine.endsWith("}")) {
-      receiverTelemetry = bluetoothLine;
+  while (bluetoothReader.read(bluetooth)) {
+    if (bluetoothReader.type() == PacketType::RxTelemetry &&
+        bluetoothReader.copy(telemetry.rx)) {
       lastTelemetry = millis();
-    }
+      receivedTelemetry = true;
+      receivedTelemetryOnLink = true;
+      ++telemetry.txTelemetryPackets;
+    } else if (bluetoothReader.type() == PacketType::GpsSentence) {
+      GpsSentencePacket sentence;
 
-    bluetoothLine = "";
+      if (bluetoothReader.copy(sentence)) {
+        sendPacket(Serial, PacketType::GpsSentence, sentence);
+      }
+    }
   }
 }
 
 void sendControls(bool connected) {
-  control.j1x = map(analogRead(J1_VRX), 0, 4095, -255, 255);
-  control.j1y = map(analogRead(J1_VRY), 0, 4095, 255, -255);
-  control.j2x = map(analogRead(J2_VRX), 0, 4095, -255, 255);
-  control.j2y = map(analogRead(J2_VRY), 0, 4095, 255, -255);
-  control.speed = rotaryValue;
+  telemetry.rawTxJ1X = analogRead(J1_VRX);
+  telemetry.rawTxJ1Y = analogRead(J1_VRY);
+  telemetry.rawTxJ2X = analogRead(J2_VRX);
+  telemetry.rawTxJ2Y = analogRead(J2_VRY);
 
-  if (!connected) {
-    return;
+  control.controlJ1X = map(telemetry.rawTxJ1X, 0, 4095, -255, 255);
+  control.controlJ1Y = map(telemetry.rawTxJ1Y, 0, 4095, 255, -255);
+  control.controlJ2X = map(telemetry.rawTxJ2X, 0, 4095, -255, 255);
+  control.controlJ2Y = map(telemetry.rawTxJ2Y, 0, 4095, 255, -255);
+
+  if (connected) {
+    ++control.controlSequence;
+    sendPacket(bluetooth, PacketType::Control, control);
   }
-
-  snprintf(commandLine, sizeof(commandLine),
-           "C %d %d %d %d %d %d %d %d %d %u %d %d\n", control.j1x, control.j1y,
-           control.j2x, control.j2y, control.speed, control.servoLock,
-           control.motorLock, control.speedLimit, control.stopped,
-           control.gpsResetId, control.servoDefaultAngle,
-           control.servoMaxDeflection);
-
-  bluetooth.print(commandLine);
 }
 
 void reportTelemetry(bool connected) {
-  bool fresh = connected && receiverTelemetry.length() > 0 &&
-               millis() - lastTelemetry < CONTROL_TIMEOUT_MS;
-  const char *data =
-      "\"accX\":0,\"accY\":0,\"accZ\":0,\"resG\":0,"
-      "\"gyroX\":0,\"gyroY\":0,\"gyroZ\":0,\"imuAvailable\":false,"
-      "\"gpsFix\":false,\"filterInitialized\":false,\"gpsResetId\":0,"
-      "\"active\":false,\"motorSpeed\":0,\"servoAngle\":60,"
-      "\"servoLocked\":false,\"motorLocked\":false,\"speedLimit\":-1,"
-      "\"stopped\":"
-      "false}";
+  telemetry.txUptimeMs = millis();
+  telemetry.txTelemetryAgeMs = receivedTelemetry
+                                    ? telemetry.txUptimeMs - lastTelemetry
+                                    : UINT32_MAX;
 
-  if (fresh) {
-    data = receiverTelemetry.c_str() + 1;
-  }
+  telemetry.txConnected = connected;
+  telemetry.txTelemetryFresh = connected && receivedTelemetryOnLink &&
+                               telemetry.txTelemetryAgeMs < CONTROL_TIMEOUT_MS;
 
-  int length = snprintf(
-      jsonLine, sizeof(jsonLine),
-      "{\"j1x\":%d,\"j1y\":%d,\"j2x\":%d,\"j2y\":%d,\"speed\":%d,"
-      "\"connected\":%s,\"telemetryFresh\":%s,%s\n",
-      control.j1x, control.j1y, control.j2x, control.j2y, control.speed,
-      connected ? "true" : "false", fresh ? "true" : "false", data);
-
-  if (length > 0 && length < TELEMETRY_JSON_SIZE) {
-    Serial.write(jsonLine, length);
-  }
+  sendPacket(Serial, PacketType::MonitorTelemetry, telemetry);
 }
 
 void setup() {
-  Serial.setTxBufferSize(TELEMETRY_JSON_SIZE);
-  Serial.begin(115200);
+  Serial.setTxBufferSize(4096);
+  Serial.begin(SERIAL_BAUD);
+
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(ROTARY_CLK_PIN, INPUT_PULLUP);
-  pinMode(ROTARY_DT_PIN, INPUT_PULLUP);
-  lastClock = digitalRead(ROTARY_CLK_PIN);
-  attachInterrupt(digitalPinToInterrupt(ROTARY_CLK_PIN), updateEncoder, CHANGE);
+
   analogSetWidth(12);
 
   serialLine.reserve(64);
-  bluetoothLine.reserve(TELEMETRY_JSON_SIZE);
-  receiverTelemetry.reserve(TELEMETRY_JSON_SIZE);
+
   bluetooth.begin(BT_TX_NAME);
 }
 
 void loop() {
   bool connected = bluetooth.connected();
   digitalWrite(LED_BUILTIN, connected ? HIGH : LOW);
-  readSerialCommands();
 
   if (connected) {
     readTelemetry();
   } else {
-    receiverTelemetry = "";
-    bluetoothLine = "";
-    bluetoothOverflow = false;
+    bluetoothReader.reset();
+    receivedTelemetryOnLink = false;
   }
 
-  if (millis() - lastSend >= CONTROL_INTERVAL_MS) {
-    lastSend = millis();
+  readSerialCommands();
+
+  uint32_t now = millis();
+
+  if (now - lastSend >= CONTROL_INTERVAL_MS) {
+    lastSend = now;
     sendControls(connected);
   }
 
-  if (millis() - lastReport >= TELEMETRY_INTERVAL_MS) {
-    lastReport = millis();
+  if (now - lastReport >= TELEMETRY_INTERVAL_MS) {
+    lastReport = now;
     reportTelemetry(connected);
   }
 
