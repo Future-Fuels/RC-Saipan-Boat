@@ -2,11 +2,14 @@
 #include <Arduino.h>
 #include <BluetoothSerial.h>
 #include <ESP32Servo.h>
+#include <Preferences.h>
 #include <TinyGPS++.h>
 #include <Wire.h>
 #include <stdlib.h>
 
 #include "rx.h"
+
+#define BT_CONNECT_RETRY_MS 3000UL
 
 #define GPS_BAUD 9600UL
 #define GPS_MAX_AGE_MS 2000UL
@@ -98,14 +101,12 @@ void resetGpsOrigin() {
   eastFilter = AxisFilter{};
   northFilter = AxisFilter{};
 
-  telemetry.gpsOriginReady = 0;
+  telemetry.gpsOriginReady = telemetry.filterInitialized = 0;
   telemetry.gpsOriginLatitude = telemetry.gpsOriginLongitude = 0;
   telemetry.gpsEast = telemetry.gpsNorth = 0;
 
   telemetry.imuEast = telemetry.imuNorth = 0;
   telemetry.imuEastVelocity = telemetry.imuNorthVelocity = 0;
-
-  telemetry.filterInitialized = 0;
 
   lastGpsPositionEpoch = lastGpsVelocityEpoch = -1;
 }
@@ -312,8 +313,9 @@ void processGpsSentence(bool connected) {
 
   telemetry.rxGpsSampleMs = now;
 
-  bool hasTime = *gpsField(1);
-  double epoch = hasTime ? strtod(gpsField(1), nullptr) : -1;
+  const char *utc = gpsField(1);
+  bool hasTime = *utc;
+  double epoch = hasTime ? strtod(utc, nullptr) : -1;
   telemetry.rawGpsUtc = hasTime ? epoch : NAN;
 
   bool fix = rmc ? *gpsField(2) == 'A' : *gpsField(6) > '0';
@@ -528,11 +530,28 @@ void reportTelemetry(bool connected, uint32_t now) {
     sendPacket(bluetooth, PacketType::RxTelemetry, telemetry);
 }
 
+void restoreImuCalibration() {
+  Preferences preferences;
+
+  if (!preferences.begin(IMU_CALIBRATION_NAMESPACE, true))
+    return;
+
+  adafruit_bno055_offsets_t offsets{};
+  bool loaded =
+      preferences.getBytes(IMU_CALIBRATION_KEY, &offsets, sizeof(offsets)) ==
+      sizeof(offsets);
+  preferences.end();
+
+  if (loaded)
+    bno.setSensorOffsets(offsets);
+}
+
 void connectTransmitter(void *) {
   for (;;) {
     if (!bluetooth.connected())
-      bluetooth.connect(String(BT_TX_NAME));
-    vTaskDelay(pdMS_TO_TICKS(CONNECT_RETRY_MS));
+      bluetooth.connect(BT_TX_NAME);
+
+    vTaskDelay(pdMS_TO_TICKS(BT_CONNECT_RETRY_MS));
   }
 }
 
@@ -565,12 +584,13 @@ void setup() {
 
   telemetry.imuAvailable = bno.begin(OPERATION_MODE_NDOF);
 
-  if (telemetry.imuAvailable)
+  if (telemetry.imuAvailable) {
+    restoreImuCalibration();
     bno.setExtCrystalUse(true);
+  }
 
-  bluetooth.begin(BT_RX_NAME, true);
-
-  xTaskCreate(connectTransmitter, "bt connect", 4096, nullptr, 1, nullptr);
+  if (bluetooth.begin(BT_RX_NAME, true))
+    xTaskCreate(connectTransmitter, "bt connect", 4096, nullptr, 1, nullptr);
 }
 
 void loop() {

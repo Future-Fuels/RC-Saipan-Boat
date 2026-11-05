@@ -6,6 +6,9 @@
 #define IMU_SDA 21
 #define IMU_SCL 22
 
+#define IMU_CALIBRATION_NAMESPACE "rcboat-imu"
+#define IMU_CALIBRATION_KEY "offsets"
+
 #define GPS_RX 16
 #define GPS_TX 17
 

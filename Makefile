@@ -6,7 +6,8 @@ PORT_RX       := /dev/tty.usbserial-3
 
 .PHONY: all clean compiledb \
         tx-build tx-upload tx-monitor tx-run tx-clean \
-        rx-build rx-upload rx-monitor rx-run rx-clean
+        rx-build rx-upload rx-monitor rx-run rx-clean \
+        imu-calibrate-build imu-calibrate-upload imu-calibrate-monitor imu-calibrate-run
 
 all: tx-build rx-build
 
@@ -49,3 +50,17 @@ rx-run: rx-upload
 
 rx-clean:
 	$(PIO) run -e rx --target clean
+
+
+# imu calibration
+imu-calibrate-build:
+	$(PIO) run -e imu-calibrate
+
+imu-calibrate-upload:
+	$(PIO) run -e imu-calibrate --target upload --upload-port $(PORT_RX)
+
+imu-calibrate-monitor:
+	$(PIO) device monitor --environment imu-calibrate --baud $(MONITOR_SPEED) --port $(PORT_RX)
+
+imu-calibrate-run: imu-calibrate-upload
+	$(MAKE) imu-calibrate-monitor
